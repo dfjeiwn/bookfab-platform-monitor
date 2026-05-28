@@ -6,11 +6,52 @@ import json
 import base64
 import hashlib
 import hmac
+import re
 import time
+from urllib.parse import urlparse
+
 import requests
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from loguru import logger
+
+
+_EMOJI_PREFIX_RE = re.compile(
+    r"^[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF]+\s*"
+)
+_BULLET_SPLIT_RE = re.compile(r"[，、；;。\n]+")
+
+
+def _strip_leading_emoji(text: str) -> str:
+    """剥掉字符串开头的 emoji（如 '🔐 新加密方式' -> '新加密方式'）。"""
+    if not text:
+        return ""
+    return _EMOJI_PREFIX_RE.sub("", text).strip()
+
+
+def _split_to_bullets(text: Optional[str]) -> List[str]:
+    """把单字符串按中英文标点切成多 bullet，过滤空白。"""
+    if not text:
+        return []
+    parts = [p.strip() for p in _BULLET_SPLIT_RE.split(text)]
+    return [p for p in parts if p]
+
+
+def _domain_to_source_name(url: Optional[str]) -> str:
+    """从 URL 推断来源名（audible.com -> Audible）；失败时回落到“官方网站”。"""
+    if not url:
+        return "官方网站"
+    try:
+        host = urlparse(url).netloc or url
+    except Exception:
+        return "官方网站"
+    host = host.lower().lstrip(".")
+    if host.startswith("www."):
+        host = host[4:]
+    label = host.split(".")[0] if host else ""
+    if not label:
+        return "官方网站"
+    return label[:1].upper() + label[1:]
 
 
 class FeishuBot:
@@ -105,6 +146,62 @@ class FeishuBot:
         }
         return self._send(payload)
 
+    _PRIORITY_GROUPS = [
+        ("high", "🚨 高风险"),
+        ("medium", "⚠️ 中风险"),
+        ("low", "ℹ️ 低风险"),
+    ]
+    _PRIORITY_LABEL = {"high": "高风险", "medium": "中风险", "low": "低风险"}
+
+    def _build_risk_block(self, update: Dict[str, Any]) -> str:
+        """渲染单条风险的 lark_md 文本。"""
+        platform = update.get("platform", "")
+        details = update.get("details", "") or ""
+
+        title = update.get("title") or details
+        if not title:
+            title = _strip_leading_emoji(update.get("type", "")) or "平台变更"
+
+        # 影响 / 动作：优先 list 字段，否则把旧字符串按标点切 bullet
+        impacts = update.get("impacts") or _split_to_bullets(update.get("impact"))
+        actions = update.get("actions") or _split_to_bullets(update.get("action"))
+
+        # 情报源：优先 list 字段；否则用 official_url + 域名推断
+        sources = update.get("sources")
+        if not sources and update.get("official_url"):
+            sources = [{
+                "name": _domain_to_source_name(update["official_url"]),
+                "url": update["official_url"],
+            }]
+
+        lines = [f"**{platform} ｜ {title}**", ""]
+
+        lines.append("**风险**")
+        lines.append(details or "（无详细描述）")
+
+        if impacts:
+            lines.append("")
+            lines.append("**可能影响**")
+            lines.extend(f"- {item}" for item in impacts)
+
+        if actions:
+            lines.append("")
+            lines.append("**建议动作**")
+            lines.extend(f"- {item}" for item in actions)
+
+        if sources:
+            lines.append("")
+            lines.append("**原始情报源**")
+            for src in sources:
+                name = (src.get("name") or "官方网站").strip()
+                url = (src.get("url") or "").strip()
+                if url:
+                    lines.append(f"- [{name}]({url})")
+                else:
+                    lines.append(f"- {name}")
+
+        return "\n".join(lines)
+
     def send_platform_update_card(
         self,
         date: str,
@@ -112,130 +209,97 @@ class FeishuBot:
         no_updates: List[str] = None,
         at_all: bool = False
     ) -> bool:
-        """发送平台更新卡片消息（卡片式布局，结论置顶）"""
+        """发送平台监控日报卡片（按风险等级分组 + 多小节）。"""
 
-        elements = []
+        elements: List[Dict[str, Any]] = []
+        updates = updates or []
+        no_updates = no_updates or []
 
-        # @所有人（仅高优先级）
-        if at_all and updates and any(u.get("priority") == "high" for u in updates):
+        if at_all and any(u.get("priority") == "high" for u in updates):
             elements.append({
                 "tag": "div",
-                "text": {
-                    "tag": "lark_md",
-                    "content": "<at user_id=\"all\">所有人</at>"
-                }
+                "text": {"tag": "lark_md", "content": "<at user_id=\"all\">所有人</at>"},
             })
 
-        # ========== 第一部分：今日概览（置顶）==========
-        if updates:
-            high_count = sum(1 for u in updates if u.get("priority") == "high")
-            medium_count = sum(1 for u in updates if u.get("priority") == "medium")
-            low_count = sum(1 for u in updates if u.get("priority") == "low")
+        # ========== 顶部概览 ==========
+        total_platforms = len(updates) + len(no_updates)
+        counts = {p: sum(1 for u in updates if u.get("priority") == p) for p in ("high", "medium", "low")}
 
-            # 今日概览 - 简洁自然的表达
-            overview_text = f"今日共 {len(updates)} 个平台变更：高 {high_count} / 中 {medium_count} / 低 {low_count}"
+        overview_lines = [
+            f"今日监控平台：{total_platforms}",
+            f"发现有效风险：{len(updates)}",
+        ]
+        breakdown = [
+            f"{self._PRIORITY_LABEL[p]}：{counts[p]}"
+            for p in ("high", "medium", "low") if counts[p] > 0
+        ]
+        if breakdown:
+            overview_lines.append(" ｜ ".join(breakdown))
 
-            if high_count > 0:
-                overview_text += f"\n⚠️ {high_count} 个高优先级需立即关注"
+        elements.append({
+            "tag": "div",
+            "text": {"tag": "lark_md", "content": "\n".join(overview_lines)},
+        })
 
-            elements.append({
-                "tag": "div",
-                "text": {
-                    "tag": "lark_md",
-                    "content": overview_text
-                }
-            })
+        # ========== 风险分组 ==========
+        rendered_any_group = False
+        for priority, header_text in self._PRIORITY_GROUPS:
+            group = [u for u in updates if u.get("priority") == priority]
+            if not group:
+                continue
 
             elements.append({"tag": "hr"})
-
-        # ========== 第二部分：变更详情 ==========
-        if updates:
             elements.append({
                 "tag": "div",
-                "text": {
-                    "tag": "lark_md",
-                    "content": "变更详情："
-                }
+                "text": {"tag": "lark_md", "content": f"**{header_text}**"},
             })
 
-            for idx, update in enumerate(updates, 1):
-                platform = update["platform"]
-                update_type = update["type"]
-                details = update["details"]
-                priority = update.get("priority", "medium")
-                official_url = update.get("official_url", "")
-                impact = update.get("impact", "")
-                action = update.get("action", "")
-
-                # 优先级标签
-                priority_label = {"high": "高", "medium": "中", "low": "低"}.get(priority, "中")
-
-                # 整合后的简洁格式
-                card_content = f"**{platform}** [{priority_label}]\n"
-
-                # 类型+详情合并为一行
-                card_content += f"{details}\n"
-
-                if official_url:
-                    card_content += f"[官网]({official_url})\n"
-
-                # 影响+对策合并
-                if impact and action:
-                    card_content += f"问题：{impact}\n"
-                    card_content += f"对策：{action}"
-                elif impact:
-                    card_content += f"问题：{impact}"
-                elif action:
-                    card_content += f"对策：{action}"
-
-                # 每个平台作为一个独立的卡片区域
+            for idx, update in enumerate(group):
                 elements.append({
                     "tag": "div",
-                    "text": {
-                        "tag": "lark_md",
-                        "content": card_content
-                    }
+                    "text": {"tag": "lark_md", "content": self._build_risk_block(update)},
                 })
-
-                # 平台之间用分割线分隔
-                if idx < len(updates):
+                if idx < len(group) - 1:
                     elements.append({"tag": "hr"})
+            rendered_any_group = True
 
-        # ========== 第三部分：状态正常的平台 ==========
+        # ========== 状态正常 ==========
         if no_updates:
             elements.append({"tag": "hr"})
+            preview = ", ".join(no_updates[:10])
+            suffix = "..." if len(no_updates) > 10 else ""
             elements.append({
                 "tag": "div",
                 "text": {
                     "tag": "lark_md",
-                    "content": f"**状态正常（{len(no_updates)}个）：** {', '.join(no_updates[:10])}{'...' if len(no_updates) > 10 else ''}"
-                }
+                    "content": f"**状态正常（{len(no_updates)} 个）：** {preview}{suffix}",
+                },
             })
 
-        # 页脚
+        if not rendered_any_group and not no_updates:
+            elements.append({"tag": "hr"})
+            elements.append({
+                "tag": "div",
+                "text": {"tag": "lark_md", "content": "今日各平台均未检测到有效风险。"},
+            })
+
         elements.append({
             "tag": "note",
             "elements": [
-                {
-                    "tag": "plain_text",
-                    "content": "BookFab 平台监控 | 每日 10:00 自动推送"
-                }
-            ]
+                {"tag": "plain_text", "content": "BookFab 平台监控 | 每日 10:00 自动推送"}
+            ],
         })
 
-        # 构建卡片
         card = {
-            "config": {
-                "wide_screen_mode": True
-            },
+            "config": {"wide_screen_mode": True},
             "header": {
                 "title": {
                     "tag": "plain_text",
-                    "content": f"BookFab 平台监控日报 ({date})"
+                    "content": f"🤖 BookFab 平台监控日报 | {date}",
                 },
-                "template": "blue"
+                "template": "blue",
             },
-            "elements": elements
+            "elements": elements,
         }
 
         return self.send_interactive_card(card)
@@ -253,16 +317,30 @@ if __name__ == "__main__":
         secret=config["feishu"].get("secret")
     )
 
-    # 测试发送更新卡片（增强版）
+    # 高风险：使用新版 list 字段
+    # 中风险：保留旧版单字符串字段，验证 fallback 路径
     test_updates = [
         {
             "platform": "Audible",
             "type": "🔐 新加密方式",
-            "details": "检测到 AAXC 加密格式更新",
+            "title": "AACX DRM 更新",
+            "details": "检测到 AACX 文件结构变化，现有解密逻辑可能失效。",
             "priority": "high",
             "official_url": "https://www.audible.com/",
-            "impact": "可能导致现有解密工具失效，用户无法下载有声书",
-            "action": "开发团队需在一周内调研新加密算法，评估解密方案"
+            "impacts": [
+                "用户无法下载新购买有声书",
+                "解密失败率上升",
+                "BookFab Audible 模块稳定性下降",
+            ],
+            "actions": [
+                "获取新版样本验证",
+                "检查解密兼容性",
+                "补充自动化回归测试",
+            ],
+            "sources": [
+                {"name": "Reddit", "url": "https://reddit.com/r/audible/xxxxx"},
+                {"name": "Audible", "url": "https://www.audible.com/"},
+            ],
         },
         {
             "platform": "Piccoma",
@@ -270,9 +348,9 @@ if __name__ == "__main__":
             "details": "Android v3.45.0 发布",
             "priority": "medium",
             "official_url": "https://play.google.com/store/apps/details?id=jp.piccoma.android",
-            "impact": "可能影响图片加载和下载功能",
-            "action": "监控用户反馈，如有问题优先处理"
-        }
+            "impact": "可能影响图片加载和下载功能，缩略图渲染或异常",
+            "action": "监控用户反馈；如有问题优先处理；安排回归测试",
+        },
     ]
 
     result = bot.send_platform_update_card(

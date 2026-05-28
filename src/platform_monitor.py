@@ -36,8 +36,12 @@ class PlatformUpdate:
     priority: Priority
     timestamp: datetime
     official_url: Optional[str] = None  # 官方链接
-    impact: Optional[str] = None  # 影响分析
-    action: Optional[str] = None  # 建议行动
+    impact: Optional[str] = None  # 影响分析（旧字段，字符串）
+    action: Optional[str] = None  # 建议行动（旧字段，字符串）
+    title: Optional[str] = None  # 风险标题，如 "AACX DRM 更新"
+    impacts: Optional[List[str]] = None  # 影响分析列表，渲染为多 bullet
+    actions: Optional[List[str]] = None  # 建议动作列表，渲染为多 bullet
+    sources: Optional[List[Dict[str, str]]] = None  # 情报源 [{"name": "Reddit", "url": "..."}]
     raw_data: Optional[Dict] = None
 
 
@@ -206,14 +210,27 @@ class MockPlatformMonitor(BasePlatformMonitor):
     """
 
     # 模拟的更新场景（不再硬编码链接，由 PlatformLinkManager 动态获取）
+    # 新结构（title/impacts/actions/sources）与旧结构（impact/action）混用，验证两条路径
     MOCK_SCENARIOS = {
         "Audible": [
             {
                 "type": UpdateType.NEW_ENCRYPTION,
-                "details": "检测到 AAXC 加密格式更新",
+                "title": "AACX DRM 更新",
+                "details": "检测到 AACX 文件结构变化，现有解密逻辑可能失效。",
                 "priority": Priority.HIGH,
-                "impact": "可能导致现有解密工具失效，用户无法下载有声书",
-                "action": "开发团队需在一周内调研新加密算法，评估解密方案"
+                "impacts": [
+                    "用户无法下载新购买有声书",
+                    "解密失败率上升",
+                    "BookFab Audible 模块稳定性下降",
+                ],
+                "actions": [
+                    "获取新版样本验证",
+                    "检查解密兼容性",
+                    "补充自动化回归测试",
+                ],
+                "sources": [
+                    {"name": "Reddit", "url": "https://reddit.com/r/audible/xxxxx"},
+                ],
             },
             {
                 "type": UpdateType.NEW_VERSION,
@@ -233,10 +250,21 @@ class MockPlatformMonitor(BasePlatformMonitor):
             },
             {
                 "type": UpdateType.API_CHANGE,
-                "details": "图片加载接口变更",
+                "title": "图片加载接口变更",
+                "details": "检测到 Piccoma 图片 CDN 路径与签名算法变更。",
                 "priority": Priority.HIGH,
-                "impact": "图片下载功能可能失效，影响核心用户体验",
-                "action": "研发部门需立即跟进，评估接口变更影响范围"
+                "impacts": [
+                    "图片下载功能可能失效",
+                    "已缓存内容仍可用，但新内容拉取受影响",
+                ],
+                "actions": [
+                    "研发立即抓包对比新旧签名",
+                    "评估接口变更影响范围",
+                    "准备热修方案",
+                ],
+                "sources": [
+                    {"name": "Piccoma", "url": "https://piccoma.com/help/"},
+                ],
             },
         ],
         "Kobo": [
@@ -301,7 +329,11 @@ class MockPlatformMonitor(BasePlatformMonitor):
                         timestamp=datetime.now(),
                         official_url=official_url,
                         impact=scenario.get("impact"),
-                        action=scenario.get("action")
+                        action=scenario.get("action"),
+                        title=scenario.get("title"),
+                        impacts=scenario.get("impacts"),
+                        actions=scenario.get("actions"),
+                        sources=scenario.get("sources"),
                     ))
 
         return updates
@@ -375,7 +407,11 @@ def format_updates_for_feishu(updates: Dict[str, List[PlatformUpdate]]) -> List[
                 "time": update.timestamp.strftime("%H:%M"),
                 "official_url": update.official_url,
                 "impact": update.impact,
-                "action": update.action
+                "action": update.action,
+                "title": update.title,
+                "impacts": update.impacts,
+                "actions": update.actions,
+                "sources": update.sources,
             })
 
     # 按优先级排序
