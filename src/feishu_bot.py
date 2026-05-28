@@ -112,12 +112,24 @@ class FeishuBot:
         no_updates: List[str] = None,
         at_all: bool = False
     ) -> bool:
-        """发送平台更新卡片消息"""
+        """发送平台更新卡片消息（增强版，包含影响分析和行动建议）"""
 
         # 构建卡片元素
         elements = []
 
-        # 标题
+        # @所有人（如果有高优先级更新）
+        if at_all and updates:
+            has_high = any(u.get("priority") == "high" for u in updates)
+            if has_high:
+                elements.append({
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": "<at user_id=\"all\">所有人</at>"
+                    }
+                })
+
+        # 标题区
         elements.append({
             "tag": "div",
             "text": {
@@ -128,7 +140,27 @@ class FeishuBot:
 
         elements.append({"tag": "hr"})
 
-        # 有更新的平台
+        # 概览统计
+        if updates:
+            high_count = sum(1 for u in updates if u.get("priority") == "high")
+            medium_count = sum(1 for u in updates if u.get("priority") == "medium")
+            low_count = sum(1 for u in updates if u.get("priority") == "low")
+
+            elements.append({
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": (
+                        f"**📊 今日概览**\n"
+                        f"🔴 高优先级：{high_count} 项\n"
+                        f"🟡 中优先级：{medium_count} 项\n"
+                        f"🟢 低优先级：{low_count} 项"
+                    )
+                }
+            })
+            elements.append({"tag": "hr"})
+
+        # 有更新的平台（详细卡片）
         if updates:
             elements.append({
                 "tag": "div",
@@ -138,11 +170,14 @@ class FeishuBot:
                 }
             })
 
-            for update in updates:
+            for idx, update in enumerate(updates, 1):
                 platform = update["platform"]
                 update_type = update["type"]
                 details = update["details"]
                 priority = update.get("priority", "medium")
+                official_url = update.get("official_url", "")
+                impact = update.get("impact", "")
+                action = update.get("action", "")
 
                 # 优先级标识
                 priority_icon = {
@@ -151,18 +186,66 @@ class FeishuBot:
                     "low": "🟢"
                 }.get(priority, "⚪")
 
+                # 构建平台更新详情
+                content_lines = [
+                    f"{priority_icon} **{idx}. {platform}**",
+                    f"",
+                    f"📍 **类型：** {update_type}",
+                    f"📝 **详情：** {details}",
+                ]
+
+                # 添加官方链接
+                if official_url:
+                    content_lines.append(f"🔗 **官方链接：** [{platform} 官网]({official_url})")
+
+                # 添加影响分析
+                if impact:
+                    content_lines.append(f"⚠️ **影响分析：** {impact}")
+
+                # 添加行动建议
+                if action:
+                    content_lines.append(f"💡 **建议行动：** {action}")
+
+                elements.append({
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": "\n".join(content_lines)
+                    }
+                })
+
+                # 每个平台之间加分隔线
+                if idx < len(updates):
+                    elements.append({"tag": "hr"})
+
+            elements.append({"tag": "hr"})
+
+        # 总结建议
+        if updates:
+            high_priority_updates = [u for u in updates if u.get("priority") == "high"]
+            if high_priority_updates:
                 elements.append({
                     "tag": "div",
                     "text": {
                         "tag": "lark_md",
                         "content": (
-                            f"{priority_icon} **{platform}**\n"
-                            f"   类型：{update_type}\n"
-                            f"   详情：{details}"
+                            f"**📌 重点关注**\n"
+                            f"今日有 **{len(high_priority_updates)}** 个高优先级变更，"
+                            f"请相关团队尽快评估影响并采取行动。"
                         )
                     }
                 })
-
+            else:
+                elements.append({
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": (
+                            f"**📌 今日总结**\n"
+                            f"今日检测到的变更均为中低优先级，建议按计划跟进。"
+                        )
+                    }
+                })
             elements.append({"tag": "hr"})
 
         # 无更新的平台（可选显示）
@@ -186,14 +269,15 @@ class FeishuBot:
                     }
                 })
 
+            elements.append({"tag": "hr"})
+
         # 页脚
-        elements.append({"tag": "hr"})
         elements.append({
             "tag": "note",
             "elements": [
                 {
                     "tag": "plain_text",
-                    "content": "🤖 BookFab 平台监控机器人 | 自动推送"
+                    "content": "🤖 BookFab 平台监控机器人 | 每天10:00自动推送 | 如需支持请联系研发团队"
                 }
             ]
         })
@@ -208,20 +292,10 @@ class FeishuBot:
                     "tag": "plain_text",
                     "content": "📚 BookFab 平台监控日报"
                 },
-                "template": "blue" if updates else "green"
+                "template": "red" if any(u.get("priority") == "high" for u in updates) else ("blue" if updates else "green")
             },
             "elements": elements
         }
-
-        # @所有人
-        if at_all and updates:
-            elements.insert(0, {
-                "tag": "div",
-                "text": {
-                    "tag": "lark_md",
-                    "content": "<at user_id=\"all\">所有人</at>"
-                }
-            })
 
         return self.send_interactive_card(card)
 
@@ -238,19 +312,25 @@ if __name__ == "__main__":
         secret=config["feishu"].get("secret")
     )
 
-    # 测试发送更新卡片
+    # 测试发送更新卡片（增强版）
     test_updates = [
         {
             "platform": "Audible",
             "type": "🔐 新加密方式",
             "details": "检测到 AAXC 加密格式更新",
-            "priority": "high"
+            "priority": "high",
+            "official_url": "https://www.audible.com/",
+            "impact": "可能导致现有解密工具失效，用户无法下载有声书",
+            "action": "开发团队需在一周内调研新加密算法，评估解密方案"
         },
         {
             "platform": "Piccoma",
             "type": "📱 客户端新版本",
             "details": "Android v3.45.0 发布",
-            "priority": "medium"
+            "priority": "medium",
+            "official_url": "https://play.google.com/store/apps/details?id=jp.piccoma.android",
+            "impact": "可能影响图片加载和下载功能",
+            "action": "监控用户反馈，如有问题优先处理"
         }
     ]
 

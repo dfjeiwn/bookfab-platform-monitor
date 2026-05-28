@@ -16,73 +16,87 @@ monitor:
       type: "成人漫画/小说/写真"
       priority: "high"
       enabled: true
+      official_url: "https://www.fanza.jp/"
 
     - name: "Audiobooks.com"
       type: "有声书"
       priority: "high"
       enabled: true
+      official_url: "https://www.audiobooks.com/"
 
     - name: "DMM Books"
       type: "漫画/小说/写真/杂志"
       priority: "high"
       enabled: true
+      official_url: "https://book.dmm.com/"
 
     - name: "Piccoma"
       type: "漫画/条漫"
       priority: "high"
       enabled: true
+      official_url: "https://piccoma.com/"
 
     - name: "Audible"
       type: "有声书"
       priority: "high"
       enabled: true
+      official_url: "https://www.audible.com/"
 
     - name: "Kobo"
       type: "电子书"
       priority: "high"
       enabled: true
+      official_url: "https://www.kobo.com/"
 
     # 中优先级
     - name: "BookLive"
       type: "漫画/小说/轻小说/杂志"
       priority: "medium"
       enabled: true
+      official_url: "https://booklive.jp/"
 
     - name: "ChirpBooks"
       type: "有声书"
       priority: "medium"
       enabled: true
+      official_url: "https://www.chirpbooks.com/"
 
     - name: "楽天マガジン"
       type: "杂志期刊"
       priority: "medium"
       enabled: true
+      official_url: "https://magazine.rakuten.co.jp/"
 
     - name: "Cモア"
       type: "漫画/小说"
       priority: "medium"
       enabled: true
+      official_url: "https://www.cmoa.jp/"
 
     - name: "BookWalker"
       type: "漫画/轻小说"
       priority: "medium"
       enabled: true
+      official_url: "https://bookwalker.jp/"
 
     - name: "ebookJapan"
       type: "漫画/小说"
       priority: "medium"
       enabled: true
+      official_url: "https://ebookjapan.yahoo.co.jp/"
 
     - name: "Readly"
       type: "杂志期刊"
       priority: "medium"
       enabled: true
+      official_url: "https://us.readly.com/"
 
     # 低优先级
     - name: "AudiobookJP"
       type: "有声书"
       priority: "low"
       enabled: true
+      official_url: "https://audiobook.jp/"
 
 # 推送时间配置 (24小时制)
 schedule:

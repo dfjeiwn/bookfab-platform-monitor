@@ -35,6 +35,9 @@ class PlatformUpdate:
     details: str
     priority: Priority
     timestamp: datetime
+    official_url: Optional[str] = None  # 官方链接
+    impact: Optional[str] = None  # 影响分析
+    action: Optional[str] = None  # 建议行动
     raw_data: Optional[Dict] = None
 
 
@@ -66,27 +69,83 @@ class MockPlatformMonitor(BasePlatformMonitor):
     用于演示和测试，随机生成一些更新数据
     """
 
-    # 模拟的更新场景
+    # 模拟的更新场景，包含官方链接、影响分析和行动建议
     MOCK_SCENARIOS = {
         "Audible": [
-            (UpdateType.NEW_ENCRYPTION, "检测到 AAXC 加密格式更新", Priority.HIGH),
-            (UpdateType.NEW_VERSION, "iOS App v5.12.0 发布", Priority.MEDIUM),
+            {
+                "type": UpdateType.NEW_ENCRYPTION,
+                "details": "检测到 AAXC 加密格式更新",
+                "priority": Priority.HIGH,
+                "url": "https://www.audible.com/",
+                "impact": "可能导致现有解密工具失效，用户无法下载有声书",
+                "action": "开发团队需在一周内调研新加密算法，评估解密方案"
+            },
+            {
+                "type": UpdateType.NEW_VERSION,
+                "details": "iOS App v5.12.0 发布",
+                "priority": Priority.MEDIUM,
+                "url": "https://apps.apple.com/us/app/audible-audiobooks/id379693831",
+                "impact": "可能影响内置浏览器的兼容性",
+                "action": "QA团队测试新版本在内置浏览器的运行情况"
+            },
         ],
         "Piccoma": [
-            (UpdateType.NEW_VERSION, "Android v3.45.0 发布", Priority.MEDIUM),
-            (UpdateType.API_CHANGE, "图片加载接口变更", Priority.HIGH),
+            {
+                "type": UpdateType.NEW_VERSION,
+                "details": "Android v3.45.0 发布",
+                "priority": Priority.MEDIUM,
+                "url": "https://play.google.com/store/apps/details?id=jp.piccoma.android",
+                "impact": "可能影响图片加载和下载功能",
+                "action": "监控用户反馈，如有问题优先处理"
+            },
+            {
+                "type": UpdateType.API_CHANGE,
+                "details": "图片加载接口变更",
+                "priority": Priority.HIGH,
+                "url": "https://piccoma.com/",
+                "impact": "图片下载功能可能失效，影响核心用户体验",
+                "action": "研发部门需立即跟进，评估接口变更影响范围"
+            },
         ],
         "Kobo": [
-            (UpdateType.NEW_VERSION, "Desktop App v4.8.0 发布", Priority.MEDIUM),
+            {
+                "type": UpdateType.NEW_VERSION,
+                "details": "Desktop App v4.8.0 发布",
+                "priority": Priority.MEDIUM,
+                "url": "https://www.kobo.com/",
+                "impact": "桌面客户端更新，可能影响本地文件读取",
+                "action": "验证新版本是否影响现有转换器功能"
+            },
         ],
         "BookWalker": [
-            (UpdateType.NEW_ENCRYPTION, "EPUB 加密算法升级", Priority.HIGH),
+            {
+                "type": UpdateType.NEW_ENCRYPTION,
+                "details": "EPUB 加密算法升级",
+                "priority": Priority.HIGH,
+                "url": "https://bookwalker.jp/",
+                "impact": "EPUB文件解密可能失败，影响用户正常使用",
+                "action": "技术团队紧急评估，需在3天内给出解决方案"
+            },
         ],
         "FANZA": [
-            (UpdateType.SECURITY_ALERT, "登录验证流程变更", Priority.HIGH),
+            {
+                "type": UpdateType.SECURITY_ALERT,
+                "details": "登录验证流程变更",
+                "priority": Priority.HIGH,
+                "url": "https://www.fanza.jp/",
+                "impact": "内置浏览器登录可能失败，影响用户获取书库",
+                "action": "紧急修复登录模块，确保用户正常访问"
+            },
         ],
         "DMM Books": [
-            (UpdateType.API_CHANGE, "书库 API 响应格式变更", Priority.MEDIUM),
+            {
+                "type": UpdateType.API_CHANGE,
+                "details": "书库 API 响应格式变更",
+                "priority": Priority.MEDIUM,
+                "url": "https://book.dmm.com/",
+                "impact": "书库列表获取可能异常",
+                "action": "适配新API格式，确保书库正常显示"
+            },
         ],
     }
 
@@ -100,13 +159,16 @@ class MockPlatformMonitor(BasePlatformMonitor):
             if scenarios:
                 # 随机选择1-2个更新
                 selected = random.sample(scenarios, min(random.randint(1, 2), len(scenarios)))
-                for update_type, details, priority in selected:
+                for scenario in selected:
                     updates.append(PlatformUpdate(
                         platform=self.name,
-                        update_type=update_type,
-                        details=details,
-                        priority=priority,
-                        timestamp=datetime.now()
+                        update_type=scenario["type"],
+                        details=scenario["details"],
+                        priority=scenario["priority"],
+                        timestamp=datetime.now(),
+                        official_url=scenario.get("url"),
+                        impact=scenario.get("impact"),
+                        action=scenario.get("action")
                     ))
 
         return updates
@@ -177,7 +239,10 @@ def format_updates_for_feishu(updates: Dict[str, List[PlatformUpdate]]) -> List[
                 "type": update.update_type.value,
                 "details": update.details,
                 "priority": update.priority.value,
-                "time": update.timestamp.strftime("%H:%M")
+                "time": update.timestamp.strftime("%H:%M"),
+                "official_url": update.official_url,
+                "impact": update.impact,
+                "action": update.action
             })
 
     # 按优先级排序
