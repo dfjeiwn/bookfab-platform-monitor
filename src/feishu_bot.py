@@ -126,36 +126,35 @@ class FeishuBot:
                 }
             })
 
-        # ========== 第一部分：结论/概览（置顶）==========
+        # ========== 第一部分：今日概览（置顶）==========
         if updates:
             high_count = sum(1 for u in updates if u.get("priority") == "high")
             medium_count = sum(1 for u in updates if u.get("priority") == "medium")
             low_count = sum(1 for u in updates if u.get("priority") == "low")
 
-            # 结论卡片 - 使用醒目的背景色
-            conclusion_text = f"**今日共检测到 {len(updates)} 个平台变更**\n"
-            conclusion_text += f"高优先级：{high_count} 个 | 中优先级：{medium_count} 个 | 低优先级：{low_count} 个"
+            # 今日概览 - 简洁自然的表达
+            overview_text = f"今日共 {len(updates)} 个平台变更：高 {high_count} / 中 {medium_count} / 低 {low_count}"
 
             if high_count > 0:
-                conclusion_text += f"\n\n**需要立即关注：{high_count} 个高优先级变更**"
+                overview_text += f"\n⚠️ {high_count} 个高优先级需立即关注"
 
             elements.append({
                 "tag": "div",
                 "text": {
                     "tag": "lark_md",
-                    "content": conclusion_text
+                    "content": overview_text
                 }
             })
 
             elements.append({"tag": "hr"})
 
-        # ========== 第二部分：卡片式平台详情 ==========
+        # ========== 第二部分：变更详情 ==========
         if updates:
             elements.append({
                 "tag": "div",
                 "text": {
                     "tag": "lark_md",
-                    "content": "**详细变更信息：**"
+                    "content": "变更详情："
                 }
             })
 
