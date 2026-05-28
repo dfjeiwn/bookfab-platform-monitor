@@ -167,26 +167,26 @@ class FeishuBot:
                 impact = update.get("impact", "")
                 action = update.get("action", "")
 
-                # 优先级颜色和标签
-                priority_config = {
-                    "high": {"label": "高", "color": "red"},
-                    "medium": {"label": "中", "color": "orange"},
-                    "low": {"label": "低", "color": "blue"}
-                }.get(priority, {"label": "中", "color": "orange"})
+                # 优先级标签
+                priority_label = {"high": "高", "medium": "中", "low": "低"}.get(priority, "中")
 
-                # 构建卡片内容 - 使用简洁的文本列表
-                card_content = f"**{platform}** [{priority_config['label']}]\n"
-                card_content += f"• 类型：{update_type}\n"
-                card_content += f"• 详情：{details}"
+                # 整合后的简洁格式
+                card_content = f"**{platform}** [{priority_label}]\n"
+
+                # 类型+详情合并为一行
+                card_content += f"{details}\n"
 
                 if official_url:
-                    card_content += f"\n• [官网]({official_url})"
+                    card_content += f"[官网]({official_url})\n"
 
-                if impact:
-                    card_content += f"\n• 影响：{impact}"
-
-                if action:
-                    card_content += f"\n• 行动：{action}"
+                # 影响+对策合并
+                if impact and action:
+                    card_content += f"问题：{impact}\n"
+                    card_content += f"对策：{action}"
+                elif impact:
+                    card_content += f"问题：{impact}"
+                elif action:
+                    card_content += f"对策：{action}"
 
                 # 每个平台作为一个独立的卡片区域
                 elements.append({
