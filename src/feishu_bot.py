@@ -112,35 +112,21 @@ class FeishuBot:
         no_updates: List[str] = None,
         at_all: bool = False
     ) -> bool:
-        """发送平台更新卡片消息（增强版，包含影响分析和行动建议）"""
+        """发送平台更新卡片消息（简洁版）"""
 
-        # 构建卡片元素
         elements = []
 
-        # @所有人（如果有高优先级更新）
-        if at_all and updates:
-            has_high = any(u.get("priority") == "high" for u in updates)
-            if has_high:
-                elements.append({
-                    "tag": "div",
-                    "text": {
-                        "tag": "lark_md",
-                        "content": "<at user_id=\"all\">所有人</at>"
-                    }
-                })
+        # @所有人（仅高优先级）
+        if at_all and updates and any(u.get("priority") == "high" for u in updates):
+            elements.append({
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": "<at user_id=\"all\">所有人</at>"
+                }
+            })
 
-        # 标题区
-        elements.append({
-            "tag": "div",
-            "text": {
-                "tag": "lark_md",
-                "content": f"**📅 监控日期：** {date}"
-            }
-        })
-
-        elements.append({"tag": "hr"})
-
-        # 概览统计
+        # 简洁概览 - 只用文字，不用彩色圆圈
         if updates:
             high_count = sum(1 for u in updates if u.get("priority") == "high")
             medium_count = sum(1 for u in updates if u.get("priority") == "medium")
@@ -150,23 +136,18 @@ class FeishuBot:
                 "tag": "div",
                 "text": {
                     "tag": "lark_md",
-                    "content": (
-                        f"**📊 今日概览**\n"
-                        f"🔴 高优先级：{high_count} 项\n"
-                        f"🟡 中优先级：{medium_count} 项\n"
-                        f"🟢 低优先级：{low_count} 项"
-                    )
+                    "content": f"**今日概览：** 高优先 {high_count} 项 | 中优先 {medium_count} 项 | 低优先 {low_count} 项"
                 }
             })
             elements.append({"tag": "hr"})
 
-        # 有更新的平台（详细卡片）
+        # 更新列表 - 使用结构化布局
         if updates:
             elements.append({
                 "tag": "div",
                 "text": {
                     "tag": "lark_md",
-                    "content": "**🚨 检测到变更的平台**"
+                    "content": "**检测到变更的平台：**"
                 }
             })
 
@@ -179,97 +160,70 @@ class FeishuBot:
                 impact = update.get("impact", "")
                 action = update.get("action", "")
 
-                # 优先级标识
-                priority_icon = {
-                    "high": "🔴",
-                    "medium": "🟡",
-                    "low": "🟢"
-                }.get(priority, "⚪")
+                # 优先级标签
+                priority_label = {
+                    "high": "[高]",
+                    "medium": "[中]",
+                    "low": "[低]"
+                }.get(priority, "[中]")
 
-                # 构建平台更新详情
-                content_lines = [
-                    f"{priority_icon} **{idx}. {platform}**",
-                    f"",
-                    f"📍 **类型：** {update_type}",
-                    f"📝 **详情：** {details}",
-                ]
+                # 构建简洁的内容块
+                content = f"**{idx}. {platform}** {priority_label}\n"
+                content += f"类型：{update_type}\n"
+                content += f"详情：{details}"
 
-                # 添加官方链接
                 if official_url:
-                    content_lines.append(f"🔗 **官方链接：** [{platform} 官网]({official_url})")
+                    content += f"\n[查看官网]({official_url})"
 
-                # 添加影响分析
                 if impact:
-                    content_lines.append(f"⚠️ **影响分析：** {impact}")
+                    content += f"\n影响：{impact}"
 
-                # 添加行动建议
                 if action:
-                    content_lines.append(f"💡 **建议行动：** {action}")
+                    content += f"\n行动：{action}"
 
                 elements.append({
                     "tag": "div",
                     "text": {
                         "tag": "lark_md",
-                        "content": "\n".join(content_lines)
+                        "content": content
                     }
                 })
 
-                # 每个平台之间加分隔线
+                # 平台之间用细线分隔
                 if idx < len(updates):
-                    elements.append({"tag": "hr"})
+                    elements.append({
+                        "tag": "hr",
+                        "tag": "div",
+                        "text": {
+                            "tag": "lark_md",
+                            "content": "---"
+                        }
+                    })
 
             elements.append({"tag": "hr"})
 
-        # 总结建议
+        # 总结 - 简洁文字
         if updates:
-            high_priority_updates = [u for u in updates if u.get("priority") == "high"]
-            if high_priority_updates:
+            high_count = sum(1 for u in updates if u.get("priority") == "high")
+            if high_count > 0:
                 elements.append({
                     "tag": "div",
                     "text": {
                         "tag": "lark_md",
-                        "content": (
-                            f"**📌 重点关注**\n"
-                            f"今日有 **{len(high_priority_updates)}** 个高优先级变更，"
-                            f"请相关团队尽快评估影响并采取行动。"
-                        )
+                        "content": f"**提示：** 今日有 {high_count} 个高优先级变更，请相关团队尽快处理。"
                     }
                 })
-            else:
-                elements.append({
-                    "tag": "div",
-                    "text": {
-                        "tag": "lark_md",
-                        "content": (
-                            f"**📌 今日总结**\n"
-                            f"今日检测到的变更均为中低优先级，建议按计划跟进。"
-                        )
-                    }
-                })
-            elements.append({"tag": "hr"})
 
-        # 无更新的平台（可选显示）
+        # 无更新的平台（简化显示）
         if no_updates:
+            elements.append({"tag": "hr"})
             elements.append({
                 "tag": "div",
                 "text": {
                     "tag": "lark_md",
-                    "content": f"**✅ 状态正常的平台（{len(no_updates)}个）**"
+                    "content": f"**状态正常：** {', '.join(no_updates[:10])}{'...' if len(no_updates) > 10 else ''}"
                 }
             })
-
-            # 分批显示，每行5个
-            for i in range(0, len(no_updates), 5):
-                batch = no_updates[i:i+5]
-                elements.append({
-                    "tag": "div",
-                    "text": {
-                        "tag": "lark_md",
-                        "content": " • ".join(batch)
-                    }
-                })
-
-            elements.append({"tag": "hr"})
 
         # 页脚
         elements.append({
@@ -277,12 +231,12 @@ class FeishuBot:
             "elements": [
                 {
                     "tag": "plain_text",
-                    "content": "🤖 BookFab 平台监控机器人 | 每天10:00自动推送 | 如需支持请联系研发团队"
+                    "content": "BookFab 平台监控 | 每日 10:00 自动推送"
                 }
             ]
         })
 
-        # 构建卡片
+        # 构建卡片 - 使用蓝色主题，简洁
         card = {
             "config": {
                 "wide_screen_mode": True
@@ -290,9 +244,9 @@ class FeishuBot:
             "header": {
                 "title": {
                     "tag": "plain_text",
-                    "content": "📚 BookFab 平台监控日报"
+                    "content": f"BookFab 平台监控日报 ({date})"
                 },
-                "template": "red" if any(u.get("priority") == "high" for u in updates) else ("blue" if updates else "green")
+                "template": "blue"
             },
             "elements": elements
         }
