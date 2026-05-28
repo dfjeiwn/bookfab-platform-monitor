@@ -1,0 +1,103 @@
+# 飞书机器人配置
+feishu:
+  # 飞书群机器人的 Webhook URL
+  # 获取方式：飞书群 -> 设置 -> 群机器人 -> 添加机器人 -> 复制 Webhook 地址
+  webhook_url: "https://open.feishu.cn/open-apis/bot/v2/hook/YOUR_WEBHOOK_TOKEN"
+
+  # 消息签名密钥（如果启用了签名验证）
+  secret: ""
+
+# 监控配置
+monitor:
+  # 监控的平台列表
+  platforms:
+    # 高优先级
+    - name: "FANZA"
+      type: "成人漫画/小说/写真"
+      priority: "high"
+      enabled: true
+
+    - name: "Audiobooks.com"
+      type: "有声书"
+      priority: "high"
+      enabled: true
+
+    - name: "DMM Books"
+      type: "漫画/小说/写真/杂志"
+      priority: "high"
+      enabled: true
+
+    - name: "Piccoma"
+      type: "漫画/条漫"
+      priority: "high"
+      enabled: true
+
+    - name: "Audible"
+      type: "有声书"
+      priority: "high"
+      enabled: true
+
+    - name: "Kobo"
+      type: "电子书"
+      priority: "high"
+      enabled: true
+
+    # 中优先级
+    - name: "BookLive"
+      type: "漫画/小说/轻小说/杂志"
+      priority: "medium"
+      enabled: true
+
+    - name: "ChirpBooks"
+      type: "有声书"
+      priority: "medium"
+      enabled: true
+
+    - name: "楽天マガジン"
+      type: "杂志期刊"
+      priority: "medium"
+      enabled: true
+
+    - name: "Cモア"
+      type: "漫画/小说"
+      priority: "medium"
+      enabled: true
+
+    - name: "BookWalker"
+      type: "漫画/轻小说"
+      priority: "medium"
+      enabled: true
+
+    - name: "ebookJapan"
+      type: "漫画/小说"
+      priority: "medium"
+      enabled: true
+
+    - name: "Readly"
+      type: "杂志期刊"
+      priority: "medium"
+      enabled: true
+
+    # 低优先级
+    - name: "AudiobookJP"
+      type: "有声书"
+      priority: "low"
+      enabled: true
+
+# 推送时间配置 (24小时制)
+schedule:
+  # 每天推送时间
+  push_time: "10:00"
+  # 时区
+  timezone: "Asia/Shanghai"
+
+# 消息模板配置
+message:
+  # 消息标题
+  title: "📚 BookFab 平台监控日报"
+
+  # 是否显示无更新的平台
+  show_no_update: false
+
+  # 高优先级平台变更时@所有人
+  at_all_on_high_priority: true

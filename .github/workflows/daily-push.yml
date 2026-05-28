@@ -1,0 +1,135 @@
+name: BookFab Platform Monitor Daily Push
+
+on:
+  # 定时触发 - 每天早上10点 (UTC+8)
+  schedule:
+    - cron: '0 2 * * *'  # UTC 2:00 = 北京时间 10:00
+
+  # 手动触发
+  workflow_dispatch:
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Create config file
+      run: |
+        mkdir -p config
+        cat > config/config.yaml << 'EOF'
+        # 飞书机器人配置
+        feishu:
+          webhook_url: "${{ secrets.FEISHU_WEBHOOK_URL }}"
+          secret: "${{ secrets.FEISHU_SECRET }}"
+
+        # 监控配置
+        monitor:
+          platforms:
+            # 高优先级
+            - name: "FANZA"
+              type: "成人漫画/小说/写真"
+              priority: "high"
+              enabled: true
+
+            - name: "Audiobooks.com"
+              type: "有声书"
+              priority: "high"
+              enabled: true
+
+            - name: "DMM Books"
+              type: "漫画/小说/写真/杂志"
+              priority: "high"
+              enabled: true
+
+            - name: "Piccoma"
+              type: "漫画/条漫"
+              priority: "high"
+              enabled: true
+
+            - name: "Audible"
+              type: "有声书"
+              priority: "high"
+              enabled: true
+
+            - name: "Kobo"
+              type: "电子书"
+              priority: "high"
+              enabled: true
+
+            # 中优先级
+            - name: "BookLive"
+              type: "漫画/小说/轻小说/杂志"
+              priority: "medium"
+              enabled: true
+
+            - name: "ChirpBooks"
+              type: "有声书"
+              priority: "medium"
+              enabled: true
+
+            - name: "楽天マガジン"
+              type: "杂志期刊"
+              priority: "medium"
+              enabled: true
+
+            - name: "Cモア"
+              type: "漫画/小说"
+              priority: "medium"
+              enabled: true
+
+            - name: "BookWalker"
+              type: "漫画/轻小说"
+              priority: "medium"
+              enabled: true
+
+            - name: "ebookJapan"
+              type: "漫画/小说"
+              priority: "medium"
+              enabled: true
+
+            - name: "Readly"
+              type: "杂志期刊"
+              priority: "medium"
+              enabled: true
+
+            # 低优先级
+            - name: "AudiobookJP"
+              type: "有声书"
+              priority: "low"
+              enabled: true
+
+        # 推送时间配置
+        schedule:
+          push_time: "10:00"
+          timezone: "Asia/Shanghai"
+
+        # 消息模板配置
+        message:
+          title: "📚 BookFab 平台监控日报"
+          show_no_update: false
+          at_all_on_high_priority: true
+        EOF
+
+    - name: Run platform monitor
+      run: |
+        cd src && python main.py
+
+    - name: Notify on failure
+      if: failure()
+      run: |
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -d '{"msg_type":"text","content":{"text":"⚠️ BookFab 平台监控推送失败，请检查 GitHub Actions 日志"}}' \
+          ${{ secrets.FEISHU_WEBHOOK_URL }}
