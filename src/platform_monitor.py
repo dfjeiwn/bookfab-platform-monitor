@@ -63,20 +63,155 @@ class BasePlatformMonitor(ABC):
         }
 
 
+class PlatformLinkManager:
+    """
+    平台链接管理器
+    根据不同更新类型返回对应的官方链接
+    """
+
+    # 各平台的链接模板配置
+    LINK_TEMPLATES = {
+        "Audible": {
+            "homepage": "https://www.audible.com/",
+            "app_store": "https://apps.apple.com/us/app/audible-audiobooks/id379693831",
+            "play_store": "https://play.google.com/store/apps/details?id=com.audible.application",
+            "release_notes": "https://www.audible.com/about/newsroom",
+            "developer_blog": "https://developer.amazon.com/blogs/appstore",
+        },
+        "Piccoma": {
+            "homepage": "https://piccoma.com/",
+            "app_store": "https://apps.apple.com/jp/app/piccoma/idxxx",
+            "play_store": "https://play.google.com/store/apps/details?id=jp.piccoma.android",
+            "release_notes": "https://piccoma.com/news/",
+            "api_docs": "https://piccoma.com/help/",
+        },
+        "Kobo": {
+            "homepage": "https://www.kobo.com/",
+            "app_store": "https://apps.apple.com/us/app/kobo-books/idxxx",
+            "play_store": "https://play.google.com/store/apps/details?id=com.kobobooks.android",
+            "release_notes": "https://www.kobo.com/help",
+        },
+        "BookWalker": {
+            "homepage": "https://bookwalker.jp/",
+            "app_store": "https://apps.apple.com/jp/app/bookwalker/idxxx",
+            "play_store": "https://play.google.com/store/apps/details?id=jp.bookwalker.reader.viewer.android",
+            "release_notes": "https://bookwalker.jp/info/",
+        },
+        "FANZA": {
+            "homepage": "https://www.fanza.jp/",
+            "security_center": "https://www.fanza.jp/help/",
+            "api_docs": "https://www.fanza.jp/",
+        },
+        "DMM Books": {
+            "homepage": "https://book.dmm.com/",
+            "app_store": "https://apps.apple.com/jp/app/dmm-books/idxxx",
+            "play_store": "https://play.google.com/store/apps/details?id=com.dmm.books.android",
+            "release_notes": "https://book.dmm.com/info/",
+        },
+        "Audiobooks.com": {
+            "homepage": "https://www.audiobooks.com/",
+            "app_store": "https://apps.apple.com/us/app/audiobooks-com/idxxx",
+            "play_store": "https://play.google.com/store/apps/details?id=com.audiobooks.androidapp",
+            "release_notes": "https://www.audiobooks.com/blog",
+        },
+        "BookLive": {
+            "homepage": "https://booklive.jp/",
+            "app_store": "https://apps.apple.com/jp/app/booklive/idxxx",
+            "play_store": "https://play.google.com/store/apps/details?id=jp.booklive.reader",
+            "release_notes": "https://booklive.jp/info/",
+        },
+        "ChirpBooks": {
+            "homepage": "https://www.chirpbooks.com/",
+            "app_store": "https://apps.apple.com/us/app/chirp-audiobooks/idxxx",
+            "play_store": "https://play.google.com/store/apps/details?id=com.chirp.books",
+            "release_notes": "https://www.chirpbooks.com/blog",
+        },
+        "Readly": {
+            "homepage": "https://us.readly.com/",
+            "app_store": "https://apps.apple.com/us/app/readly-magazines/idxxx",
+            "play_store": "https://play.google.com/store/apps/details?id=com.readly.android",
+            "release_notes": "https://us.readly.com/news/",
+        },
+        "楽天マガジン": {
+            "homepage": "https://magazine.rakuten.co.jp/",
+            "app_store": "https://apps.apple.com/jp/app/rakuten-magazine/idxxx",
+            "play_store": "https://play.google.com/store/apps/details?id=jp.co.rakuten.kobo",
+            "release_notes": "https://magazine.rakuten.co.jp/news/",
+        },
+        "Cモア": {
+            "homepage": "https://www.cmoa.jp/",
+            "app_store": "https://apps.apple.com/jp/app/cmoa/idxxx",
+            "play_store": "https://play.google.com/store/apps/details?id=jp.co.cmoa",
+            "release_notes": "https://www.cmoa.jp/info/",
+        },
+        "ebookJapan": {
+            "homepage": "https://ebookjapan.yahoo.co.jp/",
+            "app_store": "https://apps.apple.com/jp/app/ebookjapan/idxxx",
+            "play_store": "https://play.google.com/store/apps/details?id=jp.co.yahoo.android.ebookjapan",
+            "release_notes": "https://ebookjapan.yahoo.co.jp/info/",
+        },
+        "AudiobookJP": {
+            "homepage": "https://audiobook.jp/",
+            "app_store": "https://apps.apple.com/jp/app/audiobook-jp/idxxx",
+            "play_store": "https://play.google.com/store/apps/details?id=jp.co.audiobook",
+            "release_notes": "https://audiobook.jp/news/",
+        },
+    }
+
+    @classmethod
+    def get_link(cls, platform_name: str, update_type: UpdateType, details: str = "") -> str:
+        """
+        根据平台名称和更新类型获取对应的官方链接
+
+        Args:
+            platform_name: 平台名称
+            update_type: 更新类型
+            details: 更新详情（用于判断 iOS/Android）
+
+        Returns:
+            对应的官方链接
+        """
+        templates = cls.LINK_TEMPLATES.get(platform_name, {})
+
+        # 根据更新类型返回对应的链接
+        if update_type == UpdateType.NEW_VERSION:
+            # 判断是 iOS 还是 Android 更新
+            if "iOS" in details or "App Store" in details:
+                return templates.get("app_store", templates.get("homepage", ""))
+            elif "Android" in details or "Play Store" in details:
+                return templates.get("play_store", templates.get("homepage", ""))
+            else:
+                return templates.get("release_notes", templates.get("homepage", ""))
+
+        elif update_type == UpdateType.NEW_ENCRYPTION:
+            # 加密变更优先返回开发者博客或帮助中心
+            return templates.get("developer_blog", templates.get("homepage", ""))
+
+        elif update_type == UpdateType.API_CHANGE:
+            # API 变更返回 API 文档或帮助中心
+            return templates.get("api_docs", templates.get("homepage", ""))
+
+        elif update_type == UpdateType.SECURITY_ALERT:
+            # 安全告警返回安全中心或帮助中心
+            return templates.get("security_center", templates.get("homepage", ""))
+
+        # 默认返回首页
+        return templates.get("homepage", "")
+
+
 class MockPlatformMonitor(BasePlatformMonitor):
     """
     模拟平台监控器
     用于演示和测试，随机生成一些更新数据
     """
 
-    # 模拟的更新场景，包含官方链接、影响分析和行动建议
+    # 模拟的更新场景（不再硬编码链接，由 PlatformLinkManager 动态获取）
     MOCK_SCENARIOS = {
         "Audible": [
             {
                 "type": UpdateType.NEW_ENCRYPTION,
                 "details": "检测到 AAXC 加密格式更新",
                 "priority": Priority.HIGH,
-                "url": "https://www.audible.com/",
                 "impact": "可能导致现有解密工具失效，用户无法下载有声书",
                 "action": "开发团队需在一周内调研新加密算法，评估解密方案"
             },
@@ -84,7 +219,6 @@ class MockPlatformMonitor(BasePlatformMonitor):
                 "type": UpdateType.NEW_VERSION,
                 "details": "iOS App v5.12.0 发布",
                 "priority": Priority.MEDIUM,
-                "url": "https://apps.apple.com/us/app/audible-audiobooks/id379693831",
                 "impact": "可能影响内置浏览器的兼容性",
                 "action": "QA团队测试新版本在内置浏览器的运行情况"
             },
@@ -94,7 +228,6 @@ class MockPlatformMonitor(BasePlatformMonitor):
                 "type": UpdateType.NEW_VERSION,
                 "details": "Android v3.45.0 发布",
                 "priority": Priority.MEDIUM,
-                "url": "https://play.google.com/store/apps/details?id=jp.piccoma.android",
                 "impact": "可能影响图片加载和下载功能",
                 "action": "监控用户反馈，如有问题优先处理"
             },
@@ -102,7 +235,6 @@ class MockPlatformMonitor(BasePlatformMonitor):
                 "type": UpdateType.API_CHANGE,
                 "details": "图片加载接口变更",
                 "priority": Priority.HIGH,
-                "url": "https://piccoma.com/",
                 "impact": "图片下载功能可能失效，影响核心用户体验",
                 "action": "研发部门需立即跟进，评估接口变更影响范围"
             },
@@ -112,7 +244,6 @@ class MockPlatformMonitor(BasePlatformMonitor):
                 "type": UpdateType.NEW_VERSION,
                 "details": "Desktop App v4.8.0 发布",
                 "priority": Priority.MEDIUM,
-                "url": "https://www.kobo.com/",
                 "impact": "桌面客户端更新，可能影响本地文件读取",
                 "action": "验证新版本是否影响现有转换器功能"
             },
@@ -122,7 +253,6 @@ class MockPlatformMonitor(BasePlatformMonitor):
                 "type": UpdateType.NEW_ENCRYPTION,
                 "details": "EPUB 加密算法升级",
                 "priority": Priority.HIGH,
-                "url": "https://bookwalker.jp/",
                 "impact": "EPUB文件解密可能失败，影响用户正常使用",
                 "action": "技术团队紧急评估，需在3天内给出解决方案"
             },
@@ -132,7 +262,6 @@ class MockPlatformMonitor(BasePlatformMonitor):
                 "type": UpdateType.SECURITY_ALERT,
                 "details": "登录验证流程变更",
                 "priority": Priority.HIGH,
-                "url": "https://www.fanza.jp/",
                 "impact": "内置浏览器登录可能失败，影响用户获取书库",
                 "action": "紧急修复登录模块，确保用户正常访问"
             },
@@ -142,7 +271,6 @@ class MockPlatformMonitor(BasePlatformMonitor):
                 "type": UpdateType.API_CHANGE,
                 "details": "书库 API 响应格式变更",
                 "priority": Priority.MEDIUM,
-                "url": "https://book.dmm.com/",
                 "impact": "书库列表获取可能异常",
                 "action": "适配新API格式，确保书库正常显示"
             },
@@ -150,7 +278,7 @@ class MockPlatformMonitor(BasePlatformMonitor):
     }
 
     def check_updates(self) -> List[PlatformUpdate]:
-        """模拟检查更新，随机返回一些更新"""
+        """模拟检查更新，随机返回一些更新（使用 PlatformLinkManager 获取链接）"""
         updates = []
 
         # 30% 概率产生更新
@@ -160,13 +288,18 @@ class MockPlatformMonitor(BasePlatformMonitor):
                 # 随机选择1-2个更新
                 selected = random.sample(scenarios, min(random.randint(1, 2), len(scenarios)))
                 for scenario in selected:
+                    # 使用 PlatformLinkManager 动态获取官方链接
+                    official_url = PlatformLinkManager.get_link(
+                        self.name, scenario["type"], scenario["details"]
+                    )
+
                     updates.append(PlatformUpdate(
                         platform=self.name,
                         update_type=scenario["type"],
                         details=scenario["details"],
                         priority=scenario["priority"],
                         timestamp=datetime.now(),
-                        official_url=scenario.get("url"),
+                        official_url=official_url,
                         impact=scenario.get("impact"),
                         action=scenario.get("action")
                     ))
